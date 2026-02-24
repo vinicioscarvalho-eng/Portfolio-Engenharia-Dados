@@ -1,0 +1,68 @@
+-- =============================================================================
+-- PROJETO: Auditoria Financeira e Eficiência Hospitalar
+-- DESCRIÇÃO: Consultas Analíticas para suporte à decisão.
+-- TÉCNICAS: Window Functions, Agregações, Joins e Filtros de Grupo.
+-- =============================================================================
+
+-- 1. Eficiência de Ocupação por Leito
+-- Objetivo: Identificar a média de permanência dos pacientes em dias e o giro por leito.
+SELECT 
+    l.DESCRICAO_LEITO,
+    l.ALA_HOSPITALAR,
+    ROUND(AVG(a.DT_SAIDA - a.DT_ENTRADA), 2) AS MEDIA_PERMANENCIA_DIAS,
+    COUNT(a.ID_ATENDIMENTO) AS TOTAL_PACIENTES_ATENDIDOS
+FROM FATO_ATENDIMENTOS a
+INNER JOIN DIM_LEITO l ON a.ID_LEITO = l.ID_LEITO
+GROUP BY l.DESCRICAO_LEITO, l.ALA_HOSPITALAR
+ORDER BY MEDIA_PERMANENCIA_DIAS DESC;
+
+
+-- 2. Comparação de Custo Individual vs Média da Ala
+-- Objetivo: Identificar atendimentos que fugiram do padrão financeiro do seu setor.
+-- Técnica: Window Function (AVG OVER PARTITION)
+SELECT 
+    a.id_atendimento, 
+    l.ala_hospitalar, 
+    a.valor_conta, 
+    ROUND(AVG(a.VALOR_CONTA) OVER (PARTITION BY l.ALA_HOSPITALAR), 2) AS MEDIA_ALA
+FROM fato_atendimentos a
+INNER JOIN dim_leito l ON a.id_leito = l.id_leito
+ORDER BY l.ala_hospitalar;
+
+
+-- 3. Identificação de Anomalias (Cálculo do Desvio Financeiro)
+-- Objetivo: Quantificar o impacto financeiro (em R$) de cada paciente em relação à média da ala.
+SELECT 
+    a.id_atendimento, 
+    l.ala_hospitalar, 
+    a.valor_conta, 
+    ROUND(AVG(a.VALOR_CONTA) OVER (PARTITION BY l.ALA_HOSPITALAR), 2) AS MEDIA_ALA, 
+    a.valor_conta - ROUND(AVG(a.VALOR_CONTA) OVER (PARTITION BY l.ALA_HOSPITALAR), 2) AS DIFERENCA_DA_MEDIA
+FROM fato_atendimentos a
+INNER JOIN dim_leito l ON a.id_leito = l.id_leito
+ORDER BY DIFERENCA_DA_MEDIA DESC;
+
+
+-- 4. Gestão de Glosas por Convênio (Recuperação de Receita)
+-- Objetivo: Identificar os "piores pagadores" e o impacto percentual de perda por convênio.
+SELECT 
+    c.nome_convenio, 
+    SUM(a.valor_conta) AS VALOR_FATURADO, 
+    SUM(CASE WHEN a.STATUS_GLOSA = 'SIM' THEN a.valor_conta ELSE 0 END) AS VALOR_GLOSA,
+    ROUND(SUM(CASE WHEN a.STATUS_GLOSA = 'SIM' THEN a.valor_conta ELSE 0 END) / SUM(a.valor_conta) * 100, 2) AS PORCENTAGEM_PERDA_GLOSA
+FROM dim_convenio c
+INNER JOIN fato_atendimentos a ON c.id_convenio = a.id_convenio
+GROUP BY c.nome_convenio
+ORDER BY PORCENTAGEM_PERDA_GLOSA DESC;
+
+
+-- 5. Ranking de Faturamento por Ala Hospitalar
+-- Objetivo: Identificar setores com faturamento robusto (acima de R$ 15.000,00).
+SELECT 
+    l.ALA_HOSPITALAR, 
+    SUM(a.VALOR_CONTA) AS RECEITA_TOTAL
+FROM DIM_LEITO l
+INNER JOIN FATO_ATENDIMENTOS a ON l.ID_LEITO = a.ID_LEITO
+GROUP BY l.ALA_HOSPITALAR
+HAVING SUM(a.VALOR_CONTA) > 15000
+ORDER BY RECEITA_TOTAL DESC;
