@@ -1,0 +1,9 @@
+
+CREATE OR REPLACE FORCE EDITIONABLE VIEW "VINICIOS3"."VW_teste" ("ALA", "CONVENIO") AS 
+  SELECT 
+         ala, 
+         convenio
+FROM FATO_HOSPITAL_10K
+GROUP BY ala, convenio
+
+
