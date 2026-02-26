@@ -1,0 +1,53 @@
+--------------------------------------------------------
+--  Arquivo criado - quarta-feira-fevereiro-25-2026   
+--------------------------------------------------------
+--------------------------------------------------------
+--  DDL for Table FATO_HOSPITAL_10K
+--------------------------------------------------------
+
+  CREATE TABLE "VINICIOS3"."FATO_HOSPITAL_10K" 
+   (	"ID_ATENDIMENTO" NUMBER(38,0), 
+	"PACIENTE" VARCHAR2(40 BYTE), 
+	"CONVENIO" VARCHAR2(40 BYTE), 
+	"ALA" VARCHAR2(26 BYTE), 
+	"DATA_ENTRADA" DATE, 
+	"DATA_SAIDA" DATE, 
+	"VALOR_TOTAL" NUMBER(38,0), 
+	"STATUS_GLOSA" VARCHAR2(26 BYTE), 
+	"MOTIVO" VARCHAR2(26 BYTE)
+   ) SEGMENT CREATION IMMEDIATE 
+  PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255 
+ NOCOMPRESS LOGGING
+  STORAGE(INITIAL 65536 NEXT 1048576 MINEXTENTS 1 MAXEXTENTS 2147483645
+  PCTINCREASE 0 FREELISTS 1 FREELIST GROUPS 1
+  BUFFER_POOL DEFAULT FLASH_CACHE DEFAULT CELL_FLASH_CACHE DEFAULT)
+  TABLESPACE "USERS" ;
+--------------------------------------------------------
+--  DDL for View VW_FINANCEIRO_10K
+--------------------------------------------------------
+
+  CREATE OR REPLACE FORCE EDITIONABLE VIEW "VINICIOS3"."VW_FINANCEIRO_10K" ("ALA", "CONVENIO", "DATA", "VALOR_GLOSADO", "VALOR_TOTAL", "PORCENTAGEM_GLOSA_MES") AS 
+  SELECT 
+         ala, 
+         convenio,
+         TRUNC(DATA_ENTRADA, 'MM') as data, 
+         SUM(CASE WHEN status_glosa = 'SIM' THEN valor_total ELSE 0 END) AS VALOR_GLOSADO,
+         SUM (VALOR_TOTAL) AS VALOR_TOTAL,
+         ROUND(SUM(CASE WHEN status_glosa = 'SIM' THEN valor_total ELSE 0 END) / SUM (VALOR_TOTAL) *100,2) AS PORCENTAGEM_GLOSA_MES
+
+FROM FATO_HOSPITAL_10K
+GROUP BY ala, convenio, TRUNC(DATA_ENTRADA, 'MM')
+order by 3 ASC
+;
+--------------------------------------------------------
+--  DDL for View VW_OPERACIONAL_10K
+--------------------------------------------------------
+
+  CREATE OR REPLACE FORCE EDITIONABLE VIEW "VINICIOS3"."VW_OPERACIONAL_10K" ("NMR_DE_ATENDIMENTOS", "MOTIVO", "ALA", "MEDIA_DIAS_INTERNADOS", "MEDIA_VALOR_TOTAL") AS 
+  SELECT  COUNT(ID_ATENDIMENTO)AS NMR_DE_ATENDIMENTOS, MOTIVO, ALA,
+        ROUND(AVG(DATA_SAIDA - DATA_ENTRADA), 1) AS MEDIA_DIAS_INTERNADOS,
+        ROUND(AVG(VALOR_TOTAL), 2) AS MEDIA_VALOR_TOTAL
+FROM FATO_HOSPITAL_10K
+GROUP BY MOTIVO, ALA
+ORDER BY 3 DESC
+;
